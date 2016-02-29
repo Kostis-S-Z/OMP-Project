@@ -2,12 +2,12 @@ all:
     generate
     compile
     ./project
-	
+
 clean:
     rm *.o
 
 generate:
-    ./generator input 
+    ./generator input
 
 compile:
     gcc -Wall main.c -o project
