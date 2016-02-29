@@ -1,13 +1,18 @@
-all:
-    generate
-    compile
-    ./project
-
 clean:
-    rm *.o
-
+	rm -f *.out
+	rm -f *.o
 generate:
-    ./generator input
+	gcc -Wall generator.c -o NumGenerator.out
+	./NumGenerator.out datafile.out 15000000
 
-compile:
-    gcc -Wall main.c -o project
+examine:
+	gcc -Wall main.c -o project.out
+	./project.out -1 -1 datafile.out -1 -1
+
+all:
+	make generate
+	make examine
+
+
+
+
