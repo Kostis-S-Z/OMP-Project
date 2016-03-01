@@ -18,6 +18,7 @@ int main(int argc, char *argv[]) {
     const int MAX_COLLISIONS = atoi(argv[1]);
     const int MAX_TIME = atoi(argv[2]);
     const char* FILENAME = argv[3];
+    const int DAS_NANO_SECONDS_IN_SEC = 1000000000;
     if (FILENAME == NULL) {
         fprintf(stderr, "No filename given\n");
         return 1;
@@ -25,6 +26,7 @@ int main(int argc, char *argv[]) {
     const int MAX_THREADS = atoi(argv[4]);
     const int MAX_PROCESSES = atoi(argv[5]);
 
+    struct timespec start,end;
     double **coords = NULL;
     int i;
     int numOfCollisions = 0;
@@ -37,15 +39,26 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    clock_gettime(CLOCK_MONOTONIC,&start);    
     // Check points
     for (i=0; i<noOfLines && !finished; i++) {
         if (checkCollision(coords[i])) numOfCollisions++;
         if (MAX_COLLISIONS != -1 && numOfCollisions >= MAX_COLLISIONS)
             finished = 1;
-        // POSIX STUFF FOR TIME HERE
+        
+    }
+    clock_gettime(CLOCK_MONOTONIC,&end);
+
+    long timeElapsedS = end.tv_sec - start.tv_sec;
+    long timeElapsedN = end.tv_nsec - start.tv_nsec;
+
+    if (timeElapsedN < 0){
+    	timeElapsedN = DAS_NANO_SECONDS_IN_SEC + timeElapsedN;
+    	timeElapsedS--;
     }
 
     printf("%d\n", numOfCollisions);
+    printf("Time: %ld.%09ld secs \n",timeElapsedS,timeElapsedN);
     freeCoords(&coords, noOfLines);
     return 0;
 }
@@ -56,8 +69,8 @@ int countlines(FILE *file) {
     int counter=0;
 
     c=fgetc(file);
-    while(c != EOF) {
-        if(c == '\n')
+    while (c != EOF) {
+        if (c == '\n')
             counter++;
         c=fgetc(file);
     }
@@ -71,7 +84,7 @@ int readFile(const char *fname, double ***coords) {
 
     fp = fopen(fname,"r");//read only
 
-    if(fp == NULL) {
+    if (fp == NULL) {
         fprintf(stderr,"Error while opening file %s\n", fname);
         return 0;
     }
@@ -80,12 +93,12 @@ int readFile(const char *fname, double ***coords) {
     double ** temp;
     temp = (double **)malloc(no_of_lines*sizeof(double *));
     int k;
-    for(k=0;k<no_of_lines;k++) {
+    for (k=0;k<no_of_lines;k++) {
         temp[k] = (double *)malloc(3*sizeof(double));
     }
 
     int i;
-    for(i=0;i<no_of_lines;i++) {
+    for (i=0;i<no_of_lines;i++) {
         fscanf(fp,"%lf",&temp[i][0]);
         fscanf(fp,"%lf",&temp[i][1]);
         fscanf(fp,"%lf",&temp[i][2]);
