@@ -13,11 +13,8 @@ int main(int argc, char* argv[])
     {
         strcpy(filename,argv[1]);
         strcat(filename,".out");
-        printf("Filename: %s \n",filename);
 
         coordinate_index = atoi(argv[2]);
-        printf("Coordinate index: %d \n",coordinate_index);
-
     }
     else
     {
