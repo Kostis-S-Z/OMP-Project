@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
         fprintf(file,"%f,%f,%f\n",cords[i][0],cords[i][1],cords[i][2]);
     }
 
-
+    freeCords(&cords,coordinate_index);
     fclose(file);
     return 0;
 }
