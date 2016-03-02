@@ -7,6 +7,10 @@
 int countlines(FILE *file);
 int readFile(const char *fname, double ***coords);
 int checkCollision(double xyz[3]);
+int checkInRange(double **coords, int num,
+                    const int MAX_TIME,
+                    const int MAX_COLLISIONS,
+                    struct timespec start);
 int checkTime(struct timespec start,const int MAX_TIME);
 double calcTime(struct timespec start,struct timespec end);
 void freeCoords(double ***coords, int no_of_lines);
@@ -29,9 +33,7 @@ int main(int argc, char *argv[]) {
 
     struct timespec start, end;
     double **coords = NULL;
-    int i;
-    int numOfCollisions = 0;
-    int finished = 0;
+    int inRange;
 
     // Read file and write content in coords
     int noOfLines = readFile(FILENAME, &coords);
@@ -40,17 +42,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    clock_gettime(CLOCK_MONOTONIC,  &start);    
-    // Check points
-    for (i=0; i<noOfLines && !finished; i++) {
-        if (checkCollision(coords[i])) numOfCollisions++;
-        if (MAX_COLLISIONS != -1 && numOfCollisions >= MAX_COLLISIONS)
-            finished = 1;
-        if(MAX_TIME > -1)
-        	if (checkTime(start, MAX_TIME)) return 0;//exit program if time exceeded
-        
-    }
+    clock_gettime(CLOCK_MONOTONIC,  &start);
+    // Find the number of coordinates that are in range
+    inRange = checkInRange(coords, noOfLines, MAX_TIME, MAX_COLLISIONS, start);
     clock_gettime(CLOCK_MONOTONIC,  &end);
+
     double secs = calcTime(start, end);
 
     printf("Processing ratio: %f coordinates/sec \n", noOfLines/secs);
@@ -107,12 +103,33 @@ int readFile(const char *fname, double ***coords) {
 }
 
 int checkCollision(double xyz[3]) {
-  int i, collision = 1;
-  for (i=0;i<3;i++)
-      if (xyz[i] < LOW || xyz[i] > HIGH)
-          collision = 0;
+    int i, collision = 1;
+    for (i=0;i<3;i++)
+        if (xyz[i] < LOW || xyz[i] > HIGH)
+            collision = 0;
 
   return collision;
+}
+
+int checkInRange(double **coords, int num,
+                    const int MAX_TIME,
+                    const int MAX_COLLISIONS,
+                    struct timespec start) {
+    int i;
+    int inRange = 0;
+    int finished = 0;
+
+    if (MAX_COLLISIONS != -1)
+        num = MAX_COLLISIONS;
+
+    for (i=0; i<num && !finished; i++) {
+        if (checkCollision(coords[i])) inRange++;
+        if(MAX_TIME > -1)
+            if (checkTime(start, MAX_TIME)) return 0; //exit program if time exceeded
+
+    }
+
+    return inRange;
 }
 
 double calcTime(struct timespec start, struct timespec end) {
@@ -122,7 +139,7 @@ double calcTime(struct timespec start, struct timespec end) {
     if ( timeElapsed_n < 0 ) {
         timeElapsed_n = DAS_NANO_SECONDS_IN_SEC + timeElapsed_n;
         timeElapsed_s--;
-    } 
+    }
     printf("Time: %ld.%09ld secs \n",timeElapsed_s,timeElapsed_n);
 
     double secs = timeElapsed_s + timeElapsed_n/1000000000.0;
@@ -132,7 +149,7 @@ double calcTime(struct timespec start, struct timespec end) {
 
 int checkTime(struct timespec start, const int MAX_TIME){
 		struct timespec current;
-		clock_gettime(CLOCK_MONOTONIC,&current);		
+		clock_gettime(CLOCK_MONOTONIC,&current);
         if (current.tv_sec-start.tv_sec >= MAX_TIME){
         	printf("maximum time exceeded! \n");
         	printf("%ld \n", current.tv_sec-start.tv_sec);
