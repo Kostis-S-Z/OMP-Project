@@ -12,6 +12,7 @@ int main(int argc, char* argv[])
     if (argc == 3)
     {
         strcpy(filename,argv[1]);
+        strcat(filename,".out");
 
         coordinate_index = atoi(argv[2]);
     }
