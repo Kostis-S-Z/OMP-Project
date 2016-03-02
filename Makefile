@@ -9,7 +9,7 @@ generate:
 	./NumGenerator.out datafile.out 1500
 
 examine:
-	gcc -Wall main.c -o project.out
+	gcc -Wall linear.c -o project.out
 	./project.out -1 -1 datafile.out -1 -1
 
 
