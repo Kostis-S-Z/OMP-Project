@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
         cords[i][2]=(double)34*rand()/(RAND_MAX-1);
 
 
-        fprintf(file,"%f,%f,%f\n",cords[i][0],cords[i][1],cords[i][2]);
+        fprintf(file,"%f %f %f\n",cords[i][0],cords[i][1],cords[i][2]);
     }
 
     freeCords(&cords,coordinate_index);
