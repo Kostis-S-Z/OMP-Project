@@ -7,6 +7,8 @@
 int countlines(FILE *file);
 int readFile(const char *fname, double ***coords);
 int checkCollision(double xyz[3]);
+int checkTime(struct timespec start,const int MAX_TIME);
+double calcTime(struct timespec start,struct timespec end);
 void freeCoords(double ***coords, int no_of_lines);
 
 int main(int argc, char *argv[]) {
@@ -18,7 +20,6 @@ int main(int argc, char *argv[]) {
     const int MAX_COLLISIONS = atoi(argv[1]);
     const int MAX_TIME = atoi(argv[2]);
     const char* FILENAME = argv[3];
-    const int DAS_NANO_SECONDS_IN_SEC = 1000000000;
     if (FILENAME == NULL) {
         fprintf(stderr, "No filename given\n");
         return 1;
@@ -26,7 +27,7 @@ int main(int argc, char *argv[]) {
     const int MAX_THREADS = atoi(argv[4]);
     const int MAX_PROCESSES = atoi(argv[5]);
 
-    struct timespec start,end;
+    struct timespec start, end;
     double **coords = NULL;
     int i;
     int numOfCollisions = 0;
@@ -39,26 +40,21 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    clock_gettime(CLOCK_MONOTONIC,&start);    
+    clock_gettime(CLOCK_MONOTONIC,  &start);    
     // Check points
     for (i=0; i<noOfLines && !finished; i++) {
         if (checkCollision(coords[i])) numOfCollisions++;
         if (MAX_COLLISIONS != -1 && numOfCollisions >= MAX_COLLISIONS)
             finished = 1;
+        if(MAX_TIME > -1)
+        	if (checkTime(start, MAX_TIME)) return 0;//exit program if time exceeded
         
     }
-    clock_gettime(CLOCK_MONOTONIC,&end);
+    clock_gettime(CLOCK_MONOTONIC,  &end);
+    double secs = calcTime(start, end);
 
-    long timeElapsedS = end.tv_sec - start.tv_sec;
-    long timeElapsedN = end.tv_nsec - start.tv_nsec;
-
-    if (timeElapsedN < 0){
-    	timeElapsedN = DAS_NANO_SECONDS_IN_SEC + timeElapsedN;
-    	timeElapsedS--;
-    }
-
+    printf("Processing ratio: %f coordinates/sec \n", noOfLines/secs);
     printf("%d\n", numOfCollisions);
-    printf("Time: %ld.%09ld secs \n",timeElapsedS,timeElapsedN);
     freeCoords(&coords, noOfLines);
     return 0;
 }
@@ -117,6 +113,33 @@ int checkCollision(double xyz[3]) {
           collision = 0;
 
   return collision;
+}
+
+double calcTime(struct timespec start, struct timespec end) {
+    const int DAS_NANO_SECONDS_IN_SEC = 1000000000;
+    long timeElapsed_s = end.tv_sec - start.tv_sec;
+    long timeElapsed_n = end.tv_nsec - start.tv_nsec;
+    if ( timeElapsed_n < 0 ) {
+        timeElapsed_n = DAS_NANO_SECONDS_IN_SEC + timeElapsed_n;
+        timeElapsed_s--;
+    } 
+    printf("Time: %ld.%09ld secs \n",timeElapsed_s,timeElapsed_n);
+
+    double secs = timeElapsed_s + timeElapsed_n/1000000000.0;
+
+    return secs;
+}
+
+int checkTime(struct timespec start, const int MAX_TIME){
+		struct timespec current;
+		clock_gettime(CLOCK_MONOTONIC,&current);		
+        if (current.tv_sec-start.tv_sec >= MAX_TIME){
+        	printf("maximum time exceeded! \n");
+        	printf("%ld \n", current.tv_sec-start.tv_sec);
+        	return 1;
+        }
+
+        return 0;
 }
 
 void freeCoords(double ***coords, int no_of_lines) {
