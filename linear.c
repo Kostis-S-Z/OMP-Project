@@ -12,6 +12,7 @@ int checkInRange(double **coords, int num,
                     const int MAX_COLLISIONS,
                     struct timespec start);
 int checkTime(struct timespec start,const int MAX_TIME);
+void printResults(double totalTime, int inRange, int numOfCollisions);
 double calcTime(struct timespec start,struct timespec end);
 void freeCoords(double ***coords, int no_of_lines);
 
@@ -48,9 +49,7 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC,  &end);
 
     double secs = calcTime(start, end);
-
-    printf("Processing ratio: %f coordinates/sec \n", noOfLines/secs);
-    printf("%d\n", numOfCollisions);
+    printResults(secs, inRange, noOfLines);
     freeCoords(&coords, noOfLines);
     return 0;
 }
@@ -103,12 +102,13 @@ int readFile(const char *fname, double ***coords) {
 }
 
 int checkCollision(double xyz[3]) {
-    int i, collision = 1;
-    for (i=0;i<3;i++)
+    int i, inRange = 1;
+    for (i=0;i<3 && inRange;i++)
         if (xyz[i] < LOW || xyz[i] > HIGH)
-            collision = 0;
+            inRange = 0;
 
-  return collision;
+
+  return inRange;
 }
 
 int checkInRange(double **coords, int num,
@@ -121,15 +121,24 @@ int checkInRange(double **coords, int num,
 
     if (MAX_COLLISIONS != -1)
         num = MAX_COLLISIONS;
-
+    printf("NUM%d ", num);
     for (i=0; i<num && !finished; i++) {
-        if (checkCollision(coords[i])) inRange++;
+        if (checkCollision(coords[i]))
+                inRange++;
+
         if(MAX_TIME > -1)
             if (checkTime(start, MAX_TIME)) return 0; //exit program if time exceeded
 
     }
 
     return inRange;
+}
+
+void printResults(double totalTime, int inRange, int numOfCollisions) {
+    printf("Number of coordinates: %d\n", numOfCollisions);
+    printf("Number of coordinates in range: %d\n", inRange);
+    printf("In range ratio: %f\n", numOfCollisions/(double)inRange);
+    printf("Processing ratio: %f coordinates/sec \n", numOfCollisions/totalTime);
 }
 
 double calcTime(struct timespec start, struct timespec end) {
