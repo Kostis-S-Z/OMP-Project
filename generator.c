@@ -3,6 +3,8 @@
 #include <string.h>
 #include <time.h>
 
+void createCordsFile(char* filename, int coordinate_index);
+void randomize();
 void freeCords(double ***coords, int coordinate_index);
 
 int main(int argc, char* argv[])
@@ -21,25 +23,20 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
+    createCordsFile(filename, coordinate_index);
 
-    FILE *file = fopen(filename,"w+");
+    return 0;
+}
 
+
+void createCordsFile(char* filename, int coordinate_index)
+{
     int i;
-
+    int k;
     double **cords;
     cords = (double **)malloc(coordinate_index*sizeof(double *));
-    int k;
-    for (k=0;k<coordinate_index;k++){
-        cords[k] = (double *)malloc(3*sizeof(double));
-    }
 
-    int utime;
-    long int ltime;
-
-    ltime = time(NULL);
-    utime = (unsigned int) ltime / 2;
-
-    srand(utime);
+    FILE *file = fopen(filename,"w+");
 
     if (file == NULL)
     {
@@ -47,25 +44,41 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
+    for (k=0;k<coordinate_index;k++)
+    {
+        cords[k] = (double *)malloc(3*sizeof(double));
+    }
+
+    randomize();
+
     for (i=0;i<coordinate_index;i++)
     {
         cords[i][0]=(double)34*rand()/(RAND_MAX-1);
         cords[i][1]=(double)34*rand()/(RAND_MAX-1);
         cords[i][2]=(double)34*rand()/(RAND_MAX-1);
 
-
         fprintf(file,"%f %f %f\n",cords[i][0],cords[i][1],cords[i][2]);
     }
 
     freeCords(&cords,coordinate_index);
     fclose(file);
-    return 0;
 }
 
+void randomize()
+{
+    int utime;
+    long int ltime;
+
+    ltime = time(NULL);
+    utime = (unsigned int) ltime / 2;
+
+    srand(utime);
+}
 
 void freeCords(double ***coords, int coordinate_index) {
     int j=0;
-    for (j=0;j<coordinate_index;j++) {
+    for (j=0;j<coordinate_index;j++)
+    {
         free((*coords)[j]);
     }
     free(*coords);
