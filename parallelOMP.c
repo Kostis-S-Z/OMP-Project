@@ -62,21 +62,6 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-int countlines(FILE *file) {
-
-    char c;
-    int counter=0;
-
-    c=fgetc(file);
-    while (c != EOF) {
-        if (c == '\n')
-            counter++;
-        c=fgetc(file);
-    }
-
-    rewind(file);//sends pointer at the beggining
-    return counter;
-}
 
 int readFile(const char *fname, double ***coords) {
     FILE *fp;
@@ -88,25 +73,24 @@ int readFile(const char *fname, double ***coords) {
         return 0;
     }
 
-    int no_of_lines = countlines(fp);
     double ** temp;
-    temp = (double **)malloc(no_of_lines*sizeof(double *));
-    int k;
-    for (k=0;k<no_of_lines;k++) {
-        temp[k] = (double *)malloc(3*sizeof(double));
-    }
+    temp = (double **)malloc(1000*sizeof(double *));
 
-    int i;
-    for (i=0;i<no_of_lines;i++) {
+    int i=0;
+    while (!feof(fp)) {
+        temp[i] = (double *)malloc(3*sizeof(double));
         fscanf(fp,"%lf",&temp[i][0]);
         fscanf(fp,"%lf",&temp[i][1]);
         fscanf(fp,"%lf",&temp[i][2]);
+        if (i%1000 == 0)
+            temp = (double **)realloc(temp,(i+1000)*sizeof(double *));
+        i++;
     }
     *coords = temp;
 
     fclose(fp);
 
-    return no_of_lines;
+    return i--;
 }
 
 int checkCollision(double xyz[3]) {
