@@ -64,7 +64,8 @@ int main(int argc, char *argv[]) {
     double secs = calcTime(start, end);
     double cSecs = calcTime(cStart, end);
     printResults(secs, cSecs, inRange, noOfLines);
-    free(lines);
+    free(lines); // NOTE : freeCoords no longer needed
+    // NOTE: NEED TO MEASURE TIME AND PRINT RESULT ONCE
     MPI_Finalize();
     return 0;
 }
@@ -89,7 +90,7 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses) {
     } else {
         end = filesize;
     }
-    partsize =  end - start + 1; // NOT NEEDED????
+    partsize =  end - start + 1;
 
     // Memory for the file reading
     part = (char *)malloc((partsize+1)*sizeof(char));
