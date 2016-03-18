@@ -63,8 +63,33 @@ int main(int argc, char *argv[]) {
 
     double secs = calcTime(start, end);
     double cSecs = calcTime(cStart, end);
-    printResults(secs, cSecs, inRange, noOfLines);
+    
     free(lines); // NOTE : freeCoords no longer needed
+	
+	double dataForEachProccess[3];
+	double *rootBuffer = NULL;
+	dataForEachProccess[0] = secs;
+	dataForEachProccess[1] = inRange;
+	dataForEachProccess[2] = noOfLines;
+
+	if(rank == 0)
+		rootBuffer = (double*)malloc( noOfProcesses * sizeof(double) * 3 );
+	MPI_Gather(dataForEachProccess,3,MPI_DOUBLE,rootBuffer,3,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	
+	if(rank == 0 )
+	{
+		int i;
+		double whatWeWantToKeep[3];
+		whatWeWantToKeep[0] = whatWeWantToKeep[1] = whatWeWantToKeep[2] = 0;
+		for( i = 0 ; i < noOfProcesses *3 ; i = i+3 )
+		{
+			if( rootBuffer[i] > whatWeWantToKeep[0] )
+				whatWeWantToKeep[0] = rootBuffer[i];
+			whatWeWantToKeep[1] += rootBuffer[i+1];
+			whatWeWantToKeep[2] += rootBuffer[i+2];
+		}
+		printResults(whatWeWantToKeep[0], cSecs,whatWeWantToKeep[1],whatWeWantToKeep[2]);
+	}	
     // NOTE: NEED TO MEASURE TIME AND PRINT RESULT ONCE
     MPI_Finalize();
     return 0;
