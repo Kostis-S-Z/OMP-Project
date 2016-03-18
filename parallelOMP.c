@@ -76,7 +76,7 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses) {
     MPI_Offset filesize, partsize, start, end;
     char *part, *data;
     char **lines;
-    int overlap = 100;
+    int overlap = 40 * sizeof(char);  // 3 * (6dekadika + 4akeraios + teleia) + \0 +\n + 2kena * sizeof(char)
     int textStart, textEnd, numOfLines, i;
     // Open file
     MPI_File_open(MPI_COMM_WORLD, fname, MPI_MODE_RDONLY, MPI_INFO_NULL,&fh);
