@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,21 +42,21 @@ int main(int argc, char *argv[]) {
     struct timespec start, end;
     char **lines = NULL;
     int inRange;
-    int rank, noOfProcesses;
+    int rank, numOfProcesses;
 
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &noOfProcesses);
+    MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     // Read file and write content in coords
     clock_gettime(CLOCK_MONOTONIC,  &start);
-    int noOfLines = readFile(FILENAME, &lines, rank, noOfProcesses);
-    if (!noOfLines) {
+    int numOfLines = readFile(FILENAME, &lines, rank, numOfProcesses);
+    if (!numOfLines) {
         fprintf(stderr, "No data given\n");
         return 1;
     }
 
     // Find the number of coordinates that are in range
-    inRange = checkInRange(lines, noOfLines, MAX_TIME, MAX_COLLISIONS, start);
+    inRange = checkInRange(lines, numOfLines, MAX_TIME, MAX_COLLISIONS, start);
 
     clock_gettime(CLOCK_MONOTONIC,  &end);
 
@@ -67,21 +68,25 @@ int main(int argc, char *argv[]) {
 	double *rootBuffer = NULL;
 	dataForEachProccess[0] = secs;
 	dataForEachProccess[1] = inRange;
-	dataForEachProccess[2] = noOfLines;
+	dataForEachProccess[2] = numOfLines;
 
-	if(rank == 0)
-		rootBuffer = (double*)malloc( noOfProcesses * sizeof(double) * 3 );
+	if (rank == 0)
+		rootBuffer = (double*)malloc( numOfProcesses * sizeof(double) * 3 );
+		if (rootBuffer == NULL){
+			printf("Out of memory!\n");
+		}
 	MPI_Gather(dataForEachProccess,3,MPI_DOUBLE,rootBuffer,3,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
-	if(rank == 0 )
+	if (rank == 0)
 	{
 		int i;
 		double whatWeWantToKeep[3];
 		whatWeWantToKeep[0] = whatWeWantToKeep[1] = whatWeWantToKeep[2] = 0;
-		for( i = 0 ; i < noOfProcesses *3 ; i = i+3 )
+		for ( i = 0 ; i < numOfProcesses *3 ; i = i+3 )
 		{
-			if( rootBuffer[i] > whatWeWantToKeep[0] )
+			if (rootBuffer[i] > whatWeWantToKeep[0])
 				whatWeWantToKeep[0] = rootBuffer[i];
+
 			whatWeWantToKeep[1] += rootBuffer[i+1];
 			whatWeWantToKeep[2] += rootBuffer[i+2];
 		}
@@ -115,6 +120,9 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses) {
 
     // Memory for the file reading
     part = (char *)malloc((partsize+1)*sizeof(char));
+    if (part == NULL){
+    	printf("Out of memory!\n");
+    }
 
     // Read file
     MPI_File_read_at_all(fh, start, part, partsize, MPI_CHAR, MPI_STATUS_IGNORE);
@@ -137,6 +145,9 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses) {
     partsize = textEnd-textStart+1;
     // Copy the real text to a new array
     data = (char *)malloc((partsize+1)*sizeof(char));
+    if (data == NULL){
+    	printf("Out of memory!\n");
+    }
     memcpy(data, &(part[textStart]), partsize);
     free(part);
     data[partsize] = '\0';
@@ -149,6 +160,9 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses) {
 
     // Split the data into lines
     lines = (char **)malloc((numOfLines)*sizeof(char *));
+    if (lines == NULL){
+    	printf("Out of memory!\n");
+    }
     lines[0] = strtok(data,"\n");
     for (i=1; i<numOfLines; i++)
         lines[i] = strtok(NULL, "\n");
