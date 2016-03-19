@@ -87,7 +87,6 @@ int main(int argc, char *argv[]) {
 		}
 		printResults(whatWeWantToKeep[0],whatWeWantToKeep[1],whatWeWantToKeep[2]);
 	}
-    // NOTE: NEED TO MEASURE TIME AND PRINT RESULT ONCE
     MPI_Finalize();
     return 0;
 }
