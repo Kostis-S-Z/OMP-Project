@@ -16,7 +16,7 @@ int checkInRange(char ** lines, int num,
                     const int MAX_COLLISIONS,
                     struct timespec start);
 int checkTime(struct timespec start,const int MAX_TIME);
-void printResults(double totalTime, double checkingTime, int inRange, int numOfCollisions);
+void printResults(double totalTime, int inRange, int numOfCollisions);
 double calcTime(struct timespec start,struct timespec end);
 void freeCoords(char ***coords, int no_of_lines);
 
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     	omp_set_num_threads(MAX_THREADS);
     const int MAX_PROCESSES = atoi(argv[5]);
 
-    struct timespec start, cStart, end;
+    struct timespec start, end;
     char **lines = NULL;
     int inRange;
     int rank, noOfProcesses;
@@ -54,15 +54,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    clock_gettime(CLOCK_MONOTONIC,  &cStart);
-
     // Find the number of coordinates that are in range
     inRange = checkInRange(lines, noOfLines, MAX_TIME, MAX_COLLISIONS, start);
 
     clock_gettime(CLOCK_MONOTONIC,  &end);
 
     double secs = calcTime(start, end);
-    double cSecs = calcTime(cStart, end);
 
     free(lines);
 
@@ -88,7 +85,7 @@ int main(int argc, char *argv[]) {
 			whatWeWantToKeep[1] += rootBuffer[i+1];
 			whatWeWantToKeep[2] += rootBuffer[i+2];
 		}
-		printResults(whatWeWantToKeep[0], cSecs,whatWeWantToKeep[1],whatWeWantToKeep[2]);
+		printResults(whatWeWantToKeep[0],whatWeWantToKeep[1],whatWeWantToKeep[2]);
 	}
     // NOTE: NEED TO MEASURE TIME AND PRINT RESULT ONCE
     MPI_Finalize();
@@ -203,14 +200,12 @@ int checkInRange(char ** lines, int num,
     return inRange;
 }
 
-void printResults(double totalTime, double checkingTime,
-        int inRange, int numOfCollisions) {
+void printResults(double totalTime, int inRange, int numOfCollisions) {
     printf("Number of coordinates: %d\n", numOfCollisions);
     printf("Number of coordinates in range: %d\n", inRange);
     printf("In range ratio: %f\n", numOfCollisions/(double)inRange);
     printf("Processing ratio: %f coordinates/sec \n", numOfCollisions/totalTime);
     printf("Total time: %f secs \n", totalTime);
-    printf("Time without I/O: %f secs \n", checkingTime);
 }
 
 double calcTime(struct timespec start, struct timespec end) {
