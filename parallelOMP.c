@@ -15,7 +15,8 @@ int checkCollision(double xyz[3]);
 int checkInRange(char ** lines, int num,
                     const int MAX_TIME,
                     const int MAX_COLLISIONS,
-                    struct timespec start);
+                    struct timespec start,
+                    int *numOfChecked);
 int checkTime(struct timespec start,const int MAX_TIME);
 void printResults(double totalTime, int inRange, int numOfCollisions);
 double calcTime(struct timespec start,struct timespec end);
@@ -62,8 +63,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    int numOfChecked;
     // Find the number of coordinates that are in range
-    inRange = checkInRange(lines, numOfLines, MAX_TIME, MAX_COLLISIONS, start);
+    inRange = checkInRange(lines, numOfLines, MAX_TIME, MAX_COLLISIONS, start,&numOfChecked);
 
     clock_gettime(CLOCK_MONOTONIC,  &end);
     double secs = calcTime(start, end);
@@ -74,7 +76,7 @@ int main(int argc, char *argv[]) {
     double *rootBuffer = NULL;
     dataForEachProccess[0] = secs;
     dataForEachProccess[1] = inRange;
-    dataForEachProccess[2] = numOfLines;
+    dataForEachProccess[2] = numOfChecked;
 
     if (rank == 0) {
 	    rootBuffer = (double*)malloc( numOfProcesses * sizeof(double) * 3 );
@@ -104,7 +106,7 @@ int main(int argc, char *argv[]) {
 
 int readFile(char *fname, char *** res, int rank, int numOfProcesses,
                     MPI_Comm custom_comm) {
-    printf("RANK : %d\n", rank);
+
     MPI_File fh;
     MPI_Offset filesize, partsize, start, end;
     char *part, *data;
@@ -161,17 +163,22 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses,
 
     // Count the lines
     numOfLines = 0;
-    for (i=0; i<partsize; i++)
-        if (data[i] == '\n')
-            (numOfLines)++;
+	#pragma omp parallel private(i) shared(data,numOfLines,lines)
+	{    
+    	#pragma omp for reduction(+:numOfLines)
+    	for (i=0; i<partsize; i++)
+        	if (data[i] == '\n')
+            	(numOfLines)++;
+    }
 
     // Split the data into lines
     lines = (char **)malloc((numOfLines)*sizeof(char *));
-    if (lines == NULL){
+   	if (lines == NULL){
     	printf("Out of memory!\n");
     }
     lines[0] = strtok(data,"\n");
-    for (i=1; i<numOfLines; i++)
+
+	for (i=1; i<numOfLines; i++)
         lines[i] = strtok(NULL, "\n");
 
     *res = lines;
@@ -190,33 +197,39 @@ int checkCollision(double xyz[3]) {
 int checkInRange(char ** lines, int num,
                     const int MAX_TIME,
                     const int MAX_COLLISIONS,
-                    struct timespec start) {
+                    struct timespec start,
+                    int *numOfChecked) {
     int inRange = 0;
-    int i, finished;
+    int temp = 0;
+    int i;
     double coords[3];
 
     if (MAX_COLLISIONS != -1)
         num = MAX_COLLISIONS;
 
-    #pragma omp parallel private(i,finished,coords) shared(inRange)
+    #pragma omp parallel private(i,coords) shared(inRange,temp)
     {
-    finished = 0;
-    #pragma omp for reduction(+:inRange)
-    for (i=0; i<num ; i++) {
-        char * saveptr;
-        if ( finished ) i = num;
-        // Split line into three doubles
-        coords[0] = atof(strtok_r(lines[i]," ",&saveptr));
-        coords[1] = atof(strtok_r(NULL," ",&saveptr));
-        coords[2] = atof(strtok_r(NULL," ",&saveptr));
+    
+    	#pragma omp for reduction(+:inRange) reduction(+:temp)
+    	for (i=0; i<num ; i++) {
+        	char * saveptr;
+        
+        	// Split line into three doubles
+        	coords[0] = atof(strtok_r(lines[i]," ",&saveptr));
+        	coords[1] = atof(strtok_r(NULL," ",&saveptr));
+        	coords[2] = atof(strtok_r(NULL," ",&saveptr));
 
-        inRange += checkCollision(coords);
+        	inRange += checkCollision(coords);
 
-        if(MAX_TIME > -1)
-            if (checkTime(start, MAX_TIME)) finished = 1; //exit program if time exceeded
-    }
-    }
+        	temp++;
 
+        	if(MAX_TIME > -1)
+            	if (checkTime(start, MAX_TIME))
+            		i = num;//exit program if time exceeded
+            			
+    	}
+    } 
+    *numOfChecked = temp;
     return inRange;
 }
 
@@ -245,9 +258,9 @@ double calcTime(struct timespec start, struct timespec end) {
 int checkTime(struct timespec start, const int MAX_TIME){
 		struct timespec current;
 		clock_gettime(CLOCK_MONOTONIC,&current);
-        if (current.tv_sec-start.tv_sec >= MAX_TIME){
+        if (calcTime(start,current) >= MAX_TIME){
         	printf("maximum time exceeded! \n");
-        	printf("%ld \n", current.tv_sec-start.tv_sec);
+        	printf("%f \n", calcTime(start,current));
         	return 1;
         }
 
