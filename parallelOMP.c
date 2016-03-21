@@ -70,11 +70,12 @@ int main(int argc, char *argv[]) {
 	dataForEachProccess[1] = inRange;
 	dataForEachProccess[2] = numOfLines;
 
-	if (rank == 0)
+	if (rank == 0) {
 		rootBuffer = (double*)malloc( numOfProcesses * sizeof(double) * 3 );
 		if (rootBuffer == NULL){
 			printf("Out of memory!\n");
 		}
+  }
 	MPI_Gather(dataForEachProccess,3,MPI_DOUBLE,rootBuffer,3,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
 	if (rank == 0)
