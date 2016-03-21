@@ -8,9 +8,9 @@
 #define LOW 12
 #define HIGH 30
 
-
 int countlines(FILE *file);
-int readFile(char *fname, char *** res, int rank, int numOfProcesses);
+int readFile(char *fname, char *** res, int rank, int numOfProcesses,
+                    MPI_Comm custom_comm);
 int checkCollision(double xyz[3]);
 int checkInRange(char ** lines, int num,
                     const int MAX_TIME,
@@ -20,6 +20,7 @@ int checkTime(struct timespec start,const int MAX_TIME);
 void printResults(double totalTime, int inRange, int numOfCollisions);
 double calcTime(struct timespec start,struct timespec end);
 void freeCoords(char ***coords, int no_of_lines);
+void limitProcesses(int* numOfProcesses, int limit, MPI_Comm* comm);
 
 int main(int argc, char *argv[]) {
     // Program arguments and checking
@@ -47,9 +48,15 @@ int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    // Read file and write content in coords
+    MPI_Comm custom_comm = MPI_COMM_WORLD;
+
+    // Limit the number of processes
+    if (MAX_PROCESSES != -1 && MAX_PROCESSES < numOfProcesses)
+        limitProcesses(&numOfProcesses, MAX_PROCESSES, &custom_comm);
+
     clock_gettime(CLOCK_MONOTONIC,  &start);
-    int numOfLines = readFile(FILENAME, &lines, rank, numOfProcesses);
+    // Read file and write content in lines
+    int numOfLines = readFile(FILENAME, &lines, rank, numOfProcesses, custom_comm);
     if (!numOfLines) {
         fprintf(stderr, "No data given\n");
         return 1;
@@ -59,7 +66,6 @@ int main(int argc, char *argv[]) {
     inRange = checkInRange(lines, numOfLines, MAX_TIME, MAX_COLLISIONS, start);
 
     clock_gettime(CLOCK_MONOTONIC,  &end);
-
     double secs = calcTime(start, end);
 
     free(lines);
@@ -71,32 +77,34 @@ int main(int argc, char *argv[]) {
     dataForEachProccess[2] = numOfLines;
 
     if (rank == 0) {
-	      rootBuffer = (double*)malloc( numOfProcesses * sizeof(double) * 3 );
-	      if (rootBuffer == NULL){
-		        printf("Out of memory!\n");
-	      }
+	    rootBuffer = (double*)malloc( numOfProcesses * sizeof(double) * 3 );
+	    if (rootBuffer == NULL){
+		    printf("Out of memory!\n");
+	    }
     }
-    MPI_Gather(dataForEachProccess,3,MPI_DOUBLE,rootBuffer,3,MPI_DOUBLE,0,MPI_COMM_WORLD);
+    MPI_Gather(dataForEachProccess,3,MPI_DOUBLE,rootBuffer,3,MPI_DOUBLE,0,custom_comm);
 
     if (rank == 0) {
-		    int i;
-		    double whatWeWantToKeep[3];
-		    whatWeWantToKeep[0] = whatWeWantToKeep[1] = whatWeWantToKeep[2] = 0;
-		    for ( i = 0 ; i < numOfProcesses *3 ; i = i+3 ) {
-			      if (rootBuffer[i] > whatWeWantToKeep[0])
-				        whatWeWantToKeep[0] = rootBuffer[i];
+	    int i;
+	    double whatWeWantToKeep[3];
+	    whatWeWantToKeep[0] = whatWeWantToKeep[1] = whatWeWantToKeep[2] = 0;
+	    for ( i = 0 ; i < numOfProcesses *3 ; i = i+3 ) {
+    	    if (rootBuffer[i] > whatWeWantToKeep[0])
+    	        whatWeWantToKeep[0] = rootBuffer[i];
 
-			      whatWeWantToKeep[1] += rootBuffer[i+1];
-		      	whatWeWantToKeep[2] += rootBuffer[i+2];
-		    }
-		    printResults(whatWeWantToKeep[0],whatWeWantToKeep[1],whatWeWantToKeep[2]);
-	  }
+    	    whatWeWantToKeep[1] += rootBuffer[i+1];
+          	whatWeWantToKeep[2] += rootBuffer[i+2];
+	    }
+	    printResults(whatWeWantToKeep[0],whatWeWantToKeep[1],whatWeWantToKeep[2]);
+	}
     MPI_Finalize();
     return 0;
 }
 
 
-int readFile(char *fname, char *** res, int rank, int numOfProcesses) {
+int readFile(char *fname, char *** res, int rank, int numOfProcesses,
+                    MPI_Comm custom_comm) {
+    printf("RANK : %d\n", rank);
     MPI_File fh;
     MPI_Offset filesize, partsize, start, end;
     char *part, *data;
@@ -104,7 +112,7 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses) {
     int overlap = 40 * sizeof(char);  // 3 * (6dekadika + 4akeraios + teleia) + \0 +\n + 2kena * sizeof(char)
     int textStart, textEnd, numOfLines, i;
     // Open file
-    MPI_File_open(MPI_COMM_WORLD, fname, MPI_MODE_RDONLY, MPI_INFO_NULL,&fh);
+    MPI_File_open(custom_comm, fname, MPI_MODE_RDONLY, MPI_INFO_NULL,&fh);
 
     MPI_File_get_size(fh, &filesize); // Get size of file in bytes
     partsize = filesize/numOfProcesses; // The number of bytes for each process
@@ -244,4 +252,27 @@ int checkTime(struct timespec start, const int MAX_TIME){
         }
 
         return 0;
+}
+
+void limitProcesses(int* numOfProcesses, int limit, MPI_Comm* comm) {
+    MPI_Comm custom_comm = *comm;
+    // Get processes in MPI_COMM_WORLD
+    MPI_Group firstGroup;
+    MPI_Comm_group(custom_comm, &firstGroup);
+
+    // Remove uneeded ranks from the group
+    MPI_Group newGroup;
+    int ranges[3] = { limit, (*numOfProcesses)-1, 1 };
+    MPI_Group_range_excl(firstGroup, 1, &ranges, &newGroup);
+
+    // Create a new communicator
+    MPI_Comm_create(MPI_COMM_WORLD, newGroup, &custom_comm);
+    *numOfProcesses = limit;
+    *comm = custom_comm;
+
+    // If the current rank needs to be excluded
+    if (custom_comm == MPI_COMM_NULL) {
+        MPI_Finalize();
+        exit(0);
+    }
 }
