@@ -10,7 +10,7 @@
 
 int countlines(FILE *file);
 int readFile(char *fname, char *** res, int rank, int numOfProcesses,
-                    MPI_Comm custom_comm);
+                    MPI_Comm custom_comm,int maxNumOfLines);
 int checkCollision(double xyz[3]);
 int checkInRange(char ** lines, int num,
                     const int MAX_TIME,
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
 
     clock_gettime(CLOCK_MONOTONIC,  &start);
     // Read file and write content in lines
-    int numOfLines = readFile(FILENAME, &lines, rank, numOfProcesses, custom_comm);
+    int numOfLines = readFile(FILENAME, &lines, rank, numOfProcesses, custom_comm,MAX_COLLISIONS);
     if (!numOfLines) {
         fprintf(stderr, "No data given\n");
         return 1;
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
 
 
 int readFile(char *fname, char *** res, int rank, int numOfProcesses,
-                    MPI_Comm custom_comm) {
+                    MPI_Comm custom_comm, int maxNumOfLines) {
 
     MPI_File fh;
     MPI_Offset filesize, partsize, start, end;
@@ -163,12 +163,20 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses,
 
     // Count the lines
     numOfLines = 0;
-	#pragma omp parallel private(i) shared(data,numOfLines,lines)
+    int numOfLimit = 0;
+    maxNumOfLines = maxNumOfLines/numOfProcesses;
+	#pragma omp parallel private(i) shared(data,numOfLines,lines,numOfLimit)
 	{    
     	#pragma omp for reduction(+:numOfLines)
-    	for (i=0; i<partsize; i++)
-        	if (data[i] == '\n')
+    	for (i=0; i<partsize; i++){
+        	if (data[i] == '\n'){
             	(numOfLines)++;
+            	(numOfLimit)++;
+        	}
+        	if(i == maxNumOfLines-1){
+    			i = partsize;
+    		}
+    	}
     }
 
     // Split the data into lines
