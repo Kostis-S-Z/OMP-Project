@@ -64,35 +64,33 @@ int main(int argc, char *argv[]) {
 
     free(lines);
 
-	double dataForEachProccess[3];
-	double *rootBuffer = NULL;
-	dataForEachProccess[0] = secs;
-	dataForEachProccess[1] = inRange;
-	dataForEachProccess[2] = numOfLines;
+    double dataForEachProccess[3];
+    double *rootBuffer = NULL;
+    dataForEachProccess[0] = secs;
+    dataForEachProccess[1] = inRange;
+    dataForEachProccess[2] = numOfLines;
 
-	if (rank == 0) {
-		rootBuffer = (double*)malloc( numOfProcesses * sizeof(double) * 3 );
-		if (rootBuffer == NULL){
-			printf("Out of memory!\n");
-		}
-  }
-	MPI_Gather(dataForEachProccess,3,MPI_DOUBLE,rootBuffer,3,MPI_DOUBLE,0,MPI_COMM_WORLD);
+    if (rank == 0) {
+	      rootBuffer = (double*)malloc( numOfProcesses * sizeof(double) * 3 );
+	      if (rootBuffer == NULL){
+		        printf("Out of memory!\n");
+	      }
+    }
+    MPI_Gather(dataForEachProccess,3,MPI_DOUBLE,rootBuffer,3,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
-	if (rank == 0)
-	{
-		int i;
-		double whatWeWantToKeep[3];
-		whatWeWantToKeep[0] = whatWeWantToKeep[1] = whatWeWantToKeep[2] = 0;
-		for ( i = 0 ; i < numOfProcesses *3 ; i = i+3 )
-		{
-			if (rootBuffer[i] > whatWeWantToKeep[0])
-				whatWeWantToKeep[0] = rootBuffer[i];
+    if (rank == 0) {
+		    int i;
+		    double whatWeWantToKeep[3];
+		    whatWeWantToKeep[0] = whatWeWantToKeep[1] = whatWeWantToKeep[2] = 0;
+		    for ( i = 0 ; i < numOfProcesses *3 ; i = i+3 ) {
+			      if (rootBuffer[i] > whatWeWantToKeep[0])
+				        whatWeWantToKeep[0] = rootBuffer[i];
 
-			whatWeWantToKeep[1] += rootBuffer[i+1];
-			whatWeWantToKeep[2] += rootBuffer[i+2];
-		}
-		printResults(whatWeWantToKeep[0],whatWeWantToKeep[1],whatWeWantToKeep[2]);
-	}
+			      whatWeWantToKeep[1] += rootBuffer[i+1];
+		      	whatWeWantToKeep[2] += rootBuffer[i+2];
+		    }
+		    printResults(whatWeWantToKeep[0],whatWeWantToKeep[1],whatWeWantToKeep[2]);
+	  }
     MPI_Finalize();
     return 0;
 }
@@ -178,7 +176,7 @@ int checkCollision(double xyz[3]) {
         if (xyz[i] < LOW || xyz[i] > HIGH)
             inRange = 0;
 
-  return inRange;
+    return inRange;
 }
 
 int checkInRange(char ** lines, int num,
