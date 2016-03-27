@@ -24,21 +24,28 @@ void freeCoords(char ***coords, int no_of_lines);
 void limitProcesses(int* numOfProcesses, int limit, MPI_Comm* comm);
 
 int main(int argc, char *argv[]) {
-    // Program arguments and checking
+    // Check program arguments
     if (argc != 6) {
         fprintf(stderr, "Incorrect number of parameters\n");
         return 1;
     }
+    // 1st argument: Number of collisions
     const int MAX_COLLISIONS = atoi(argv[1]);
+    // 2nd argument: Maximum time the program should complete its calculations
     const int MAX_TIME = atoi(argv[2]);
+    // 3rd argument: Name of file
     char* FILENAME = argv[3];
+
     if (FILENAME == NULL) {
         fprintf(stderr, "No filename given\n");
         return 1;
     }
+    // Number of threads for OpenMP
     const int MAX_THREADS = atoi(argv[4]);
+
     if(MAX_THREADS > 0)
     	omp_set_num_threads(MAX_THREADS);
+    // Number of processes for MPI
     const int MAX_PROCESSES = atoi(argv[5]);
 
     struct timespec start, end;
@@ -47,27 +54,35 @@ int main(int argc, char *argv[]) {
     int rank, numOfProcesses;
 
     MPI_Init(&argc, &argv);
+    // Number of processes
     MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
+    // ID of each process executing this command
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    // MPI communicator of all processes
     MPI_Comm custom_comm = MPI_COMM_WORLD;
 
     // Limit the number of processes
     if (MAX_PROCESSES != -1 && MAX_PROCESSES < numOfProcesses)
         limitProcesses(&numOfProcesses, MAX_PROCESSES, &custom_comm);
 
+    // Start timer
     clock_gettime(CLOCK_MONOTONIC,  &start);
     // Read file and write content in lines
     int numOfLines = readFile(FILENAME, &lines, rank, numOfProcesses, custom_comm,MAX_COLLISIONS);
+
     if (!numOfLines) {
         fprintf(stderr, "No data given\n");
         return 1;
     }
 
+    // Number of coordinates checked
     int numOfChecked;
     // Find the number of coordinates that are in range
     inRange = checkInRange(lines, numOfLines, MAX_TIME, MAX_COLLISIONS, start,&numOfChecked);
 
+    // Stop timer
     clock_gettime(CLOCK_MONOTONIC,  &end);
+    // Calculate time elapsed
     double secs = calcTime(start, end);
 
     free(lines);
@@ -84,26 +99,32 @@ int main(int argc, char *argv[]) {
 		    printf("Out of memory!\n");
 	    }
     }
+    // Gather data from each process
     MPI_Gather(dataForEachProccess,3,MPI_DOUBLE,rootBuffer,3,MPI_DOUBLE,0,custom_comm);
 
+    // Split root buffer
     if (rank == 0) {
-	    int i;
-	    double whatWeWantToKeep[3];
-	    whatWeWantToKeep[0] = whatWeWantToKeep[1] = whatWeWantToKeep[2] = 0;
-	    for ( i = 0 ; i < numOfProcesses *3 ; i = i+3 ) {
+	     int i;
+	     double whatWeWantToKeep[3];
+	     whatWeWantToKeep[0] = whatWeWantToKeep[1] = whatWeWantToKeep[2] = 0;
+	     for ( i = 0 ; i < numOfProcesses *3 ; i = i+3 ) {
+
     	    if (rootBuffer[i] > whatWeWantToKeep[0])
     	        whatWeWantToKeep[0] = rootBuffer[i];
 
     	    whatWeWantToKeep[1] += rootBuffer[i+1];
-          	whatWeWantToKeep[2] += rootBuffer[i+2];
-	    }
-	    printResults(whatWeWantToKeep[0],whatWeWantToKeep[1],whatWeWantToKeep[2]);
+            whatWeWantToKeep[2] += rootBuffer[i+2];
+	     }
+	     printResults(whatWeWantToKeep[0],whatWeWantToKeep[1],whatWeWantToKeep[2]);
 	}
     MPI_Finalize();
     return 0;
 }
 
 
+/**
+* Read the content of the file
+*/
 int readFile(char *fname, char *** res, int rank, int numOfProcesses,
                     MPI_Comm custom_comm, int maxNumOfLines) {
 
@@ -111,16 +132,23 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses,
     MPI_Offset filesize, partsize, start, end;
     char *part, *data;
     char **lines;
-    int overlap = 40 * sizeof(char);  // 3 * (6dekadika + 4akeraios + teleia) + \0 +\n + 2kena * sizeof(char)
+    // Size of Overlap: 3 * (6decimals + 4integers + point) + "\0" + "\n" + 2 spaces
+    int overlap = 40 * sizeof(char);
     int textStart, textEnd, numOfLines, i;
+
     // Open file
     MPI_File_open(custom_comm, fname, MPI_MODE_RDONLY, MPI_INFO_NULL,&fh);
+    // Get size of file in bytes
+    MPI_File_get_size(fh, &filesize);
+    // The number of bytes for each process
+    partsize = filesize/numOfProcesses;
+    // The start of the part to be read from the process
+    start = rank*partsize;
+    // The end of the part to be read from the process
+    end = start+partsize-1;
 
-    MPI_File_get_size(fh, &filesize); // Get size of file in bytes
-    partsize = filesize/numOfProcesses; // The number of bytes for each process
-    start = rank*partsize; // The start of the part to be read from the process
-    end = start+partsize-1; // The end of the part to be read from the process
-    if (rank != numOfProcesses-1) { // Add overlap to every process except for the last
+    // Add overlap to every process except for the last
+    if (rank != numOfProcesses-1) {
         end += overlap;
     } else {
         end = filesize;
@@ -135,6 +163,7 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses,
 
     // Read file
     MPI_File_read_at_all(fh, start, part, partsize, MPI_CHAR, MPI_STATUS_IGNORE);
+    // Close file
     MPI_File_close(&fh);
     part[partsize] = '\0';
 
@@ -146,17 +175,20 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses,
             textStart++;
         textStart++;
     }
+
     if (rank != numOfProcesses-1) {
         textEnd -= overlap;
         while(part[textEnd] != '\n')
             textEnd++;
     }
     partsize = textEnd-textStart+1;
+
     // Copy the real text to a new array
     data = (char *)malloc((partsize+1)*sizeof(char));
     if (data == NULL){
     	printf("Out of memory!\n");
     }
+
     memcpy(data, &(part[textStart]), partsize);
     free(part);
     data[partsize] = '\0';
@@ -165,17 +197,19 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses,
     numOfLines = 0;
     int numOfLimit = 0;
     maxNumOfLines = maxNumOfLines/numOfProcesses;
-	#pragma omp parallel private(i) shared(data,numOfLines,lines,numOfLimit)
-	{    
-    	#pragma omp for reduction(+:numOfLines)
-    	for (i=0; i<partsize; i++){
+
+    // Split for each process parts of the file to multiple threads
+	  #pragma omp parallel private(i) shared(data,numOfLines,lines,numOfLimit)
+	  {
+      #pragma omp for reduction(+:numOfLines)
+      for (i=0; i<partsize; i++){
         	if (data[i] == '\n'){
             	(numOfLines)++;
             	(numOfLimit)++;
         	}
         	if(i == maxNumOfLines-1){
-    			i = partsize;
-    		}
+    			     i = partsize;
+    		  }
     	}
     }
 
@@ -186,13 +220,17 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses,
     }
     lines[0] = strtok(data,"\n");
 
-	for (i=1; i<numOfLines; i++)
+	  for (i=1; i<numOfLines; i++)
         lines[i] = strtok(NULL, "\n");
 
     *res = lines;
+
     return numOfLines;
 }
 
+/**
+ * Checks if the given coordinates are within the range
+ */
 int checkCollision(double xyz[3]) {
     int i, inRange = 1;
     for (i=0;i<3 && inRange;i++)
@@ -202,6 +240,9 @@ int checkCollision(double xyz[3]) {
     return inRange;
 }
 
+/**
+ * Returns the number of coordinates that are within the range
+ */
 int checkInRange(char ** lines, int num,
                     const int MAX_TIME,
                     const int MAX_COLLISIONS,
@@ -215,13 +256,14 @@ int checkInRange(char ** lines, int num,
     if (MAX_COLLISIONS != -1)
         num = MAX_COLLISIONS;
 
+    // Split for each process the calculations to multiple threads
     #pragma omp parallel private(i,coords) shared(inRange,temp)
     {
-    
+
     	#pragma omp for reduction(+:inRange) reduction(+:temp)
     	for (i=0; i<num ; i++) {
         	char * saveptr;
-        
+
         	// Split line into three doubles
         	coords[0] = atof(strtok_r(lines[i]," ",&saveptr));
         	coords[1] = atof(strtok_r(NULL," ",&saveptr));
@@ -233,14 +275,16 @@ int checkInRange(char ** lines, int num,
 
         	if(MAX_TIME > -1)
             	if (checkTime(start, MAX_TIME))
-            		i = num;//exit program if time exceeded
-            			
+            		i = num; // Exit program if time exceeded
     	}
-    } 
+    }
     *numOfChecked = temp;
     return inRange;
 }
 
+/**
+* Print the results of the program
+*/
 void printResults(double totalTime, int inRange, int numOfCollisions) {
     printf("Number of coordinates: %d\n", numOfCollisions);
     printf("Number of coordinates in range: %d\n", inRange);
@@ -249,6 +293,9 @@ void printResults(double totalTime, int inRange, int numOfCollisions) {
     printf("Total time: %f secs \n", totalTime);
 }
 
+/**
+ * Calculates the number of seconds elapsed
+ */
 double calcTime(struct timespec start, struct timespec end) {
     const int DAS_NANO_SECONDS_IN_SEC = 1000000000;
     long timeElapsed_s = end.tv_sec - start.tv_sec;
@@ -263,18 +310,27 @@ double calcTime(struct timespec start, struct timespec end) {
     return secs;
 }
 
+/**
+* Check if maximum time exceeded
+*/
 int checkTime(struct timespec start, const int MAX_TIME){
 		struct timespec current;
-		clock_gettime(CLOCK_MONOTONIC,&current);
-        if (calcTime(start,current) >= MAX_TIME){
-        	printf("maximum time exceeded! \n");
-        	printf("%f \n", calcTime(start,current));
-        	return 1;
-        }
+    // Get current time
+	clock_gettime(CLOCK_MONOTONIC,&current);
 
-        return 0;
+    if (calcTime(start,current) >= MAX_TIME){
+        printf("Maximum time exceeded! \n");
+        printf("%f \n", calcTime(start,current));
+        return 1;
+    }
+
+    return 0;
 }
 
+
+/**
+* Limit the processes to the given number
+*/
 void limitProcesses(int* numOfProcesses, int limit, MPI_Comm* comm) {
     MPI_Comm custom_comm = *comm;
     // Get processes in MPI_COMM_WORLD
