@@ -35,6 +35,7 @@ int main(int argc, char *argv[]) {
     struct timespec start, cStart, end;
     double **coords = NULL;
     int inRange;
+    double secs, cSecs;
 
     // Read file and write content in coords
     clock_gettime(CLOCK_MONOTONIC,  &start);
@@ -49,15 +50,17 @@ int main(int argc, char *argv[]) {
     inRange = checkInRange(coords, noOfLines, MAX_TIME, MAX_COLLISIONS, start);
     clock_gettime(CLOCK_MONOTONIC,  &end);
 
-    double secs = calcTime(start, end);
-    double cSecs = calcTime(cStart, end);
+    secs = calcTime(start, end);
+    cSecs = calcTime(cStart, end);
     printResults(secs, cSecs, inRange, noOfLines);
     freeCoords(&coords, noOfLines);
     return 0;
 }
 
+/**
+ * Counts the number of lines of the file
+ */
 int countlines(FILE *file) {
-
     char c;
     int counter=0;
 
@@ -72,6 +75,9 @@ int countlines(FILE *file) {
     return counter;
 }
 
+/**
+ * Puts the content of the files the coords array
+ */
 int readFile(const char *fname, double ***coords) {
     FILE *fp;
 
@@ -103,6 +109,9 @@ int readFile(const char *fname, double ***coords) {
     return no_of_lines;
 }
 
+/**
+ * Checks if the given coordinates are within the range
+ */
 int checkCollision(double xyz[3]) {
     int i, inRange = 1;
     for (i=0;i<3 && inRange;i++)
@@ -113,6 +122,9 @@ int checkCollision(double xyz[3]) {
   return inRange;
 }
 
+/**
+ * Returns the number of coordinates that are within the range
+ */
 int checkInRange(double **coords, int num,
                     const int MAX_TIME,
                     const int MAX_COLLISIONS,
@@ -136,6 +148,9 @@ int checkInRange(double **coords, int num,
     return inRange;
 }
 
+/**
+ * Prints the results
+ */
 void printResults(double totalTime, double checkingTime,
         int inRange, int numOfCollisions) {
     printf("Number of coordinates: %d\n", numOfCollisions);
@@ -146,6 +161,9 @@ void printResults(double totalTime, double checkingTime,
     printf("Time without I/O: %f secs \n", checkingTime);
 }
 
+/**
+ * Calculates the number of seconds elapsed
+ */
 double calcTime(struct timespec start, struct timespec end) {
     const int DAS_NANO_SECONDS_IN_SEC = 1000000000;
     long timeElapsed_s = end.tv_sec - start.tv_sec;
@@ -160,6 +178,9 @@ double calcTime(struct timespec start, struct timespec end) {
     return secs;
 }
 
+/**
+ * Checks if the MAX_TIME limit has been exceeded
+ */
 int checkTime(struct timespec start, const int MAX_TIME){
 		struct timespec current;
 		clock_gettime(CLOCK_MONOTONIC,&current);
@@ -172,6 +193,9 @@ int checkTime(struct timespec start, const int MAX_TIME){
         return 0;
 }
 
+/**
+ * Frees the two-dimensional array
+ */
 void freeCoords(double ***coords, int no_of_lines) {
     int j=0;
     for (j=0;j<no_of_lines;j++) {
