@@ -199,18 +199,14 @@ int readFile(char *fname, char *** res, int rank, int numOfProcesses,
     maxNumOfLines = maxNumOfLines/numOfProcesses;
 
     // Split for each process parts of the file to multiple threads
-	  #pragma omp parallel private(i) shared(data,numOfLines,lines,numOfLimit)
-	  {
-      #pragma omp for reduction(+:numOfLines)
-      for (i=0; i<partsize; i++){
-        	if (data[i] == '\n'){
-            	(numOfLines)++;
-            	(numOfLimit)++;
-        	}
-        	if(i == maxNumOfLines-1){
-    			     i = partsize;
-    		  }
-    	}
+    for (i=0; i<partsize; i++){
+        if (data[i] == '\n'){
+            (numOfLines)++;
+            (numOfLimit)++;
+        }
+        if(i == maxNumOfLines-1){
+            i = partsize;
+        }
     }
 
     // Split the data into lines
